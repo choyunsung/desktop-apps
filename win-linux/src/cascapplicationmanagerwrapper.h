@@ -99,6 +99,7 @@ enum class CScalingFactor
     SCALING_FACTOR_5
 };
 
+class QSystemTrayIcon;
 class CAscApplicationManagerWrapper;
 class CAscApplicationManagerWrapper_Private;
 typedef CAscApplicationManagerWrapper AscAppManager;
@@ -124,9 +125,11 @@ private:
     CWindowsQueue<sWinTag> * m_queueToClose;
     CEventDriver m_eventDriver;
     CMainWindow * m_pMainWindow = nullptr;
+    QSystemTrayIcon * m_pTrayIcon = nullptr;
 
     std::shared_ptr<CThemes> m_themes;
     static bool m_rtlEnabled;
+    static bool m_forceQuit;
 
 public:
     CWindowsQueue<sWinTag>& closeQueue();
@@ -188,6 +191,12 @@ public:
 
     static void             editorWindowMoving(const size_t, const QPoint&);
     static CMainWindow *    mainWindow();
+    // System tray (close-to-tray + tray menu: Open / Check for updates / Quit)
+    static void             createTrayIcon();
+    static bool             trayMinimizeActive();
+    static void             restoreMainWindow();
+    static void             quitFromTray();
+    static void             showTrayMessage(const QString& title, const QString& msg);
     static const CEditorWindow *  editorWindowFromHandle(size_t);
     static void             sendCommandTo(QCefView * target, const QString& cmd, const QString& args = "");
     static void             sendCommandTo(CCefView * target, const std::wstring& cmd, const std::wstring& args = L"");

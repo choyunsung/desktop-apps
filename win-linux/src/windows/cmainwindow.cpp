@@ -287,9 +287,15 @@ void CMainWindow::onCloseEvent()
 
 void CMainWindow::closeEvent(QCloseEvent * e)
 {
+    e->ignore();
+    // Close-to-tray: the [X] button hides the window and keeps the app running
+    // in the system tray. Real quit goes through the tray "Quit" item.
+    if (AscAppManager::trayMinimizeActive()) {
+        hide();
+        return;
+    }
     if (isEnabled())
         AscAppManager::getInstance().closeQueue().enter(sWinTag{CLOSE_QUEUE_WIN_TYPE_MAIN, size_t(this)});
-    e->ignore();
 }
 
 void CMainWindow::close()

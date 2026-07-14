@@ -47,6 +47,9 @@
 #include <QJsonArray>
 #include <QProcess>
 #include <QScreen>
+#include <QSystemTrayIcon>
+#include <QMenu>
+#include <QAction>
 #include <algorithm>
 #include <functional>
 
@@ -91,6 +94,7 @@ using namespace std::placeholders;
 
 
 bool CAscApplicationManagerWrapper::m_rtlEnabled = false;
+bool CAscApplicationManagerWrapper::m_forceQuit = false;
 
 std::wstring get_file_name_from_open_deeplink(const std::wstring& link)
 {
@@ -936,6 +940,8 @@ CMainWindow * CAscApplicationManagerWrapper::prepareMainWindow(const QRect& r)
 
 
     QObject::connect(_window, &CMainWindow::aboutToClose, this, &CAscApplicationManagerWrapper::onMainWindowClose);
+
+    createTrayIcon();
 
     return _window;
 }
@@ -1800,6 +1806,70 @@ CMainWindow * CAscApplicationManagerWrapper::mainWindow()
     return _app.m_pMainWindow;
 }
 
+void CAscApplicationManagerWrapper::restoreMainWindow()
+{
+    if ( mainWindow() ) {
+        mainWindow()->show(mainWindow()->isMaximized());
+        mainWindow()->bringToTop();
+    }
+}
+
+void CAscApplicationManagerWrapper::createTrayIcon()
+{
+    APP_CAST(_app);
+    if ( _app.m_pTrayIcon || !QSystemTrayIcon::isSystemTrayAvailable() )
+        return;
+
+    _app.m_pTrayIcon = new QSystemTrayIcon(Utils::appIcon(), &_app);
+    _app.m_pTrayIcon->setToolTip(QString(WINDOW_NAME));
+
+    QMenu * menu = new QMenu();
+    QAction * actOpen = menu->addAction(QObject::tr("Open"));
+    QObject::connect(actOpen, &QAction::triggered, &_app, [](){ restoreMainWindow(); });
+#ifdef _UPDMODULE
+    QAction * actUpd = menu->addAction(QObject::tr("Check for updates"));
+    QObject::connect(actUpd, &QAction::triggered, &_app, [](){
+        APP_CAST(a);
+        if ( a.m_pUpdateManager )
+            a.m_pUpdateManager->checkUpdatesSilent();
+    });
+#endif
+    menu->addSeparator();
+    QAction * actQuit = menu->addAction(QObject::tr("Quit"));
+    QObject::connect(actQuit, &QAction::triggered, &_app, [](){ quitFromTray(); });
+    _app.m_pTrayIcon->setContextMenu(menu);
+
+    QObject::connect(_app.m_pTrayIcon, &QSystemTrayIcon::activated, &_app,
+        [](QSystemTrayIcon::ActivationReason r){
+            if ( r == QSystemTrayIcon::Trigger || r == QSystemTrayIcon::DoubleClick )
+                restoreMainWindow();
+        });
+    _app.m_pTrayIcon->show();
+}
+
+bool CAscApplicationManagerWrapper::trayMinimizeActive()
+{
+    APP_CAST(_app);
+    return _app.m_pTrayIcon != nullptr && !m_forceQuit;
+}
+
+void CAscApplicationManagerWrapper::quitFromTray()
+{
+    // Real quit from the tray menu. m_forceQuit disables close-to-tray so windows
+    // actually close; if the user cancels a save prompt, cancelClose() resets it.
+    // The tray icon is left visible and is removed automatically on app teardown.
+    m_forceQuit = true;
+    APP_CAST(_app);
+    _app.launchAppClose();
+}
+
+void CAscApplicationManagerWrapper::showTrayMessage(const QString& title, const QString& msg)
+{
+    APP_CAST(_app);
+    if ( _app.m_pTrayIcon )
+        _app.m_pTrayIcon->showMessage(title, msg, QSystemTrayIcon::Information, 5000);
+}
+
 void CAscApplicationManagerWrapper::sendCommandTo(QCefView * target, const QString& cmd, const QString& args)
 {
     sendCommandTo(target ? target->GetCefView() : nullptr, cmd.toStdWString(), args.toStdWString() );
@@ -2351,6 +2421,8 @@ void CAscApplicationManagerWrapper::onDownloadSaveDialog(const std::wstring& nam
 void CAscApplicationManagerWrapper::cancelClose()
 {
     APP_CAST(_app);
+
+    m_forceQuit = false;   // quit/close aborted (e.g. user cancelled a save) -> keep tray-minimize active
 
     if ( _app.m_closeTarget.find(L"http") != wstring::npos ) {
         _app.sendCommandTo(SEND_TO_ALL_START_PAGE, L"portal:logout:cancel", _app.m_closeTarget);

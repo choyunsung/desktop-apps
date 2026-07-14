@@ -102,6 +102,7 @@ public:
 
 public slots:
     void checkUpdates(bool manualCheck = false);
+    void checkUpdatesSilent();   // tray: check + download + install without update dialogs
 
 private:
     void init();
@@ -121,6 +122,7 @@ private:
     bool        m_startUpdateOnClose = false,
                 m_restartAfterUpdate = false,
                 m_manualCheck = false,
+                m_silentUpdate = false,
                 m_lock = false;
 
     time_t      m_lastCheck = 0;

@@ -515,6 +515,14 @@ void CUpdateManager::checkUpdates(bool manualCheck)
     }
 }
 
+void CUpdateManager::checkUpdatesSilent()
+{
+    // Tray "Check for updates": run the whole check -> download -> install flow
+    // without any update-related dialogs (silent), regardless of autoUpdateMode.
+    m_silentUpdate = true;
+    checkUpdates(true);
+}
+
 void CUpdateManager::updateNeededCheking()
 {
     if (m_pIntervalTimer) {
@@ -567,6 +575,7 @@ void CUpdateManager::onError(const QString &error)
     if (error == "SVC_TXT_ERR_URL")
         _error = TXT_ERR_URL;
 
+    m_silentUpdate = false;
     refreshStartPage({"error", {_error}, BTN_TXT_CHECK, "check", "false"});
     __UNLOCK
 //    m_dialogSchedule->addToSchedule("criticalMsg", error);
@@ -731,6 +740,14 @@ void CUpdateManager::onLoadUpdateFinished(const QString &filePath)
     if (m_packageData->fileType == "archive") {
         __UNLOCK
         unzipIfNeeded();
+    } else if (m_silentUpdate) {
+        // Silent path: skip the "restart to install" dialog and install right away
+        // (installUpdates -> closeAppWindows -> app teardown -> handleAppClose runs the installer).
+        m_silentUpdate = false;
+        refreshStartPage({"success", {TXT_RESTART_TO_UPD}, BTN_TXT_RESTART, "install", "false"});
+        if (AscAppManager::mainWindow())
+            AscAppManager::mainWindow()->show(AscAppManager::mainWindow()->isMaximized());
+        installUpdates();
     } else {
         refreshStartPage({"success", {TXT_RESTART_TO_UPD}, BTN_TXT_RESTART, "install", "false"});
         m_dialogSchedule->addToSchedule("showStartInstallMessage");
@@ -857,13 +874,10 @@ void CUpdateManager::onCheckFinished(bool error, bool updateExist, const QString
                 m_dialogSchedule->addToSchedule("showUpdateMessage");
                 return;
             }
-            switch (getUpdateMode()) {
-            case UpdateMode::SILENT:
+            if (m_silentUpdate || getUpdateMode() == UpdateMode::SILENT) {
                 __UNLOCK
                 loadUpdates();
-                break;
-            case UpdateMode::ASK:
-            case UpdateMode::DISABLE:
+            } else {
                 if (isSavedPackageValid()) {
                     __UNLOCK
                     loadUpdates();
@@ -871,14 +885,18 @@ void CUpdateManager::onCheckFinished(bool error, bool updateExist, const QString
                     refreshStartPage({"lastcheck", {m_packageData->object == "svc" ? TXT_AVAILABLE_SVC : TXT_AVAILABLE_UPD, version}, BTN_TXT_DOWNLOAD, "download", "false"});
                     m_dialogSchedule->addToSchedule("showUpdateMessage");
                 }
-                break;
             }
         } else {
             refreshStartPage({"success", {TXT_UPDATED}, BTN_TXT_CHECK, "check", "false"});
             m_pLastCheckMsgTimer->start();
+            if (m_silentUpdate) {
+                m_silentUpdate = false;
+                AscAppManager::showTrayMessage(QString(WINDOW_NAME), QObject::tr("You have the latest version."));
+            }
             __UNLOCK;
         }
     } else {
+        m_silentUpdate = false;
         refreshStartPage({"error", {TXT_ERR_JSON}, BTN_TXT_CHECK, "check", "false"});
         __UNLOCK
 //        m_dialogSchedule->addToSchedule("criticalMsg", changelog);
