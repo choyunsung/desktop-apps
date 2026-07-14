@@ -250,15 +250,15 @@
                      @"extension"   : @"fb2"
              },
              @(AVS_OFFICESTUDIO_FILE_DOCUMENT_DOCXF): @{
-                     @"description" : NSLocalizedString(@"ONLYOFFICE Document Form Template", nil),
+                     @"description" : NSLocalizedString(@"Quetta Office Document Form Template", nil),
                      @"extension"   : @"docxf"
              },
              @(AVS_OFFICESTUDIO_FILE_DOCUMENT_OFORM): @{
-                     @"description" : NSLocalizedString(@"ONLYOFFICE Fillable Online Form", nil),
+                     @"description" : NSLocalizedString(@"Quetta Office Fillable Online Form", nil),
                      @"extension"   : @"oform"
              },
              @(AVS_OFFICESTUDIO_FILE_DOCUMENT_OFORM_PDF): @{
-                     @"description" : NSLocalizedString(@"ONLYOFFICE Form Document", nil),
+                     @"description" : NSLocalizedString(@"Quetta Office Form Document", nil),
                      @"extension"   : @"pdf"
              },
              @(AVS_OFFICESTUDIO_FILE_IMAGE_PNG): @{
